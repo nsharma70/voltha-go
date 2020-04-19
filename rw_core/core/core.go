@@ -74,8 +74,7 @@ func NewCore(ctx context.Context, id string, cf *config.RWCoreFlags, kvClient kv
 	core.backend = db.Backend{
 		Client:                  kvClient,
 		StoreType:               cf.KVStoreType,
-		Host:                    cf.KVStoreHost,
-		Port:                    cf.KVStorePort,
+		Address:                 cf.KVStoreAddress,
 		Timeout:                 cf.KVStoreTimeout,
 		LivenessChannelInterval: livenessChannelInterval,
 		PathPrefix:              cf.KVStoreDataPrefix}
@@ -169,7 +168,7 @@ func (core *Core) Stop(ctx context.Context) {
 //startGRPCService creates the grpc service handlers, registers it to the grpc server and starts the server
 func (core *Core) startGRPCService(ctx context.Context) {
 	//	create an insecure gserver server
-	core.grpcServer = grpcserver.NewGrpcServer(core.config.GrpcHost, core.config.GrpcPort, nil, false, probe.GetProbeFromContext(ctx))
+	core.grpcServer = grpcserver.NewGrpcServer(core.config.GrpcAddress, nil, false, probe.GetProbeFromContext(ctx))
 	logger.Info("grpc-server-created")
 
 	core.grpcNBIAPIHandler = api.NewAPIHandler(core.deviceMgr, core.logicalDeviceMgr, core.adapterMgr)
@@ -205,15 +204,14 @@ func (core *Core) startGRPCService(ctx context.Context) {
 
 // Initialize the kafka manager, but we will start it later
 func (core *Core) initKafkaManager(ctx context.Context) {
-	logger.Infow("initialize-kafka-manager", log.Fields{"host": core.config.KafkaAdapterHost,
-		"port": core.config.KafkaAdapterPort, "topic": core.config.CoreTopic})
+	logger.Infow("initialize-kafka-manager", log.Fields{"address": core.config.KafkaAdapterAddress,
+		"topic": core.config.CoreTopic})
 
 	probe.UpdateStatusFromContext(ctx, "message-bus", probe.ServiceStatusPreparing)
 
 	// create the proxy
 	core.kmp = kafka.NewInterContainerProxy(
-		kafka.InterContainerHost(core.config.KafkaAdapterHost),
-		kafka.InterContainerPort(core.config.KafkaAdapterPort),
+		kafka.InterContainerAddress(core.config.KafkaAdapterAddress),
 		kafka.MsgClient(core.kafkaClient),
 		kafka.DefaultTopic(&kafka.Topic{Name: core.config.CoreTopic}),
 		kafka.DeviceDiscoveryTopic(&kafka.Topic{Name: core.config.AffinityRouterTopic}))
@@ -255,8 +253,8 @@ func (core *Core) initKafkaManager(ctx context.Context) {
  */
 
 func (core *Core) startKafkaManager(ctx context.Context, startupRetryInterval time.Duration, liveProbeInterval time.Duration, notLiveProbeInterval time.Duration) {
-	logger.Infow("starting-kafka-manager-thread", log.Fields{"host": core.config.KafkaAdapterHost,
-		"port": core.config.KafkaAdapterPort, "topic": core.config.CoreTopic})
+	logger.Infow("starting-kafka-manager-thread", log.Fields{"address": core.config.KafkaAdapterAddress,
+		"topic": core.config.CoreTopic})
 
 	started := false
 	for !started {
@@ -334,8 +332,8 @@ func (core *Core) startKafkaManager(ctx context.Context, startupRetryInterval ti
 
 // waitUntilKVStoreReachableOrMaxTries will wait until it can connect to a KV store or until maxtries has been reached
 func (core *Core) waitUntilKVStoreReachableOrMaxTries(ctx context.Context, maxRetries int, retryInterval time.Duration) error {
-	logger.Infow("verifying-KV-store-connectivity", log.Fields{"host": core.config.KVStoreHost,
-		"port": core.config.KVStorePort, "retries": maxRetries, "retryInterval": retryInterval})
+	logger.Infow("verifying-KV-store-connectivity", log.Fields{"address": core.config.KVStoreAddress,
+		"retries": maxRetries, "retryInterval": retryInterval})
 	count := 0
 	for {
 		if !core.kvClient.IsConnectionUp(ctx) {
