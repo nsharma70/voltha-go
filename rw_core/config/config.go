@@ -19,6 +19,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"github.com/opencord/voltha-lib-go/v3/pkg/adapters/common"
 	"time"
 )
 
@@ -56,12 +57,30 @@ const (
 	defaultProbeAddress              = ":8080"
 )
 
+type stringValue string
+
+func (i *stringValue) Set(s string) error {
+	if err := common.ValidateAddress(s); err != nil {
+		return err
+	}
+	*i = stringValue(s)
+
+	return nil
+}
+
+func (i *stringValue) String() string {
+	if *i == "" {
+		return defaultKafkaAdapterAddress
+	}
+	return string(*i)
+}
+
 // RWCoreFlags represents the set of configurations used by the read-write core service
 type RWCoreFlags struct {
 	// Command line parameters
 	RWCoreEndpoint            string
 	GrpcAddress               string
-	KafkaAdapterAddress       string
+	KafkaAdapterAddress       stringValue
 	KafkaClusterAddress       string
 	KVStoreType               string
 	KVStoreTimeout            int // in seconds
@@ -134,7 +153,7 @@ func (cf *RWCoreFlags) ParseCommandArguments() {
 	flag.StringVar(&(cf.GrpcAddress), "grpc_address", defaultGrpcAddress, help)
 
 	help = fmt.Sprintf("Kafka - Adapter messaging address")
-	flag.StringVar(&(cf.KafkaAdapterAddress), "kafka_adapter_address", defaultKafkaAdapterAddress, help)
+	flag.Var(&(cf.KafkaAdapterAddress), "kafka_adapter_address", help)
 
 	help = fmt.Sprintf("Kafka - Cluster messaging address")
 	flag.StringVar(&(cf.KafkaClusterAddress), "kafka_cluster_address", defaultKafkaClusterAddress, help)
