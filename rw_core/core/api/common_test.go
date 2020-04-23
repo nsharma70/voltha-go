@@ -97,7 +97,8 @@ func stopEmbeddedEtcdServer(server *mock_etcd.EtcdServer) {
 }
 
 func setupKVClient(cf *config.RWCoreFlags, coreInstanceID string) kvstore.Client {
-	client, err := kvstore.NewEtcdClient(cf.KVStoreAddress, cf.KVStoreTimeout)
+	client, err := kvstore.NewEtcdClient(cf.KVStoreAddress, cf.KVStoreTimeout, log.FatalLevel)
+
 	if err != nil {
 		panic("no kv client")
 	}

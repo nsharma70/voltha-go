@@ -19,6 +19,8 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"sync"
 	"time"
 
@@ -117,13 +119,13 @@ func (aMgr *Manager) loadAdaptersAndDevicetypesInMemory() error {
 	return nil
 }
 
-func (aMgr *Manager) updateLastAdapterCommunication(adapterID string, timestamp int64) {
+func (aMgr *Manager) updateLastAdapterCommunication(adapterID string, timestamp time.Time) {
 	aMgr.lockAdaptersMap.RLock()
 	adapterAgent, have := aMgr.adapterAgents[adapterID]
 	aMgr.lockAdaptersMap.RUnlock()
 
 	if have {
-		adapterAgent.updateCommunicationTime(time.Unix(timestamp/1000, timestamp%1000*1000))
+		adapterAgent.updateCommunicationTime(timestamp)
 	}
 }
 
@@ -219,6 +221,15 @@ func (aMgr *Manager) getAdapter(adapterID string) *voltha.Adapter {
 func (aMgr *Manager) RegisterAdapter(adapter *voltha.Adapter, deviceTypes *voltha.DeviceTypes) (*voltha.CoreInstance, error) {
 	logger.Debugw("RegisterAdapter", log.Fields{"adapterId": adapter.Id, "vendor": adapter.Vendor,
 		"currentReplica": adapter.CurrentReplica, "totalReplicas": adapter.TotalReplicas, "endpoint": adapter.Endpoint, "deviceTypes": deviceTypes.Items})
+
+	if adapter.Type == "" {
+		log.Errorw("adapter-not-specifying-type", log.Fields{
+			"adapterId": adapter.Id,
+			"vendor":    adapter.Vendor,
+			"type":      adapter.Type,
+		})
+		return nil, status.Error(codes.InvalidArgument, "adapter-not-specifying-type")
+	}
 
 	if aMgr.getAdapter(adapter.Id) != nil {
 		//	Already registered - Adapter may have restarted.  Trigger the reconcile process for that adapter
