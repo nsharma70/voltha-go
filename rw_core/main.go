@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -62,14 +61,13 @@ func newKVClient(storeType string, address string, timeout int) (kvstore.Client,
 	return nil, errors.New("unsupported-kv-store")
 }
 
-func newKafkaClient(clientType string, host string, port int, instanceID string, livenessChannelInterval time.Duration) (kafka.Client, error) {
+func newKafkaClient(clientType string, address string, instanceID string, livenessChannelInterval time.Duration) (kafka.Client, error) {
 
 	logger.Infow("kafka-client-type", log.Fields{"client": clientType})
 	switch clientType {
 	case "sarama":
 		return kafka.NewSaramaClient(
-			kafka.Host(host),
-			kafka.Port(port),
+			kafka.Address(address),
 			kafka.ConsumerType(kafka.GroupCustomer),
 			kafka.ProducerReturnOnErrors(true),
 			kafka.ProducerReturnOnSuccess(true),
@@ -98,22 +96,22 @@ func newRWCore(cf *config.RWCoreFlags) *rwCore {
 func (rw *rwCore) start(ctx context.Context, instanceID string) {
 	logger.Info("Starting RW Core components")
 
+	var err error
+
 	// Setup KV Client
 	logger.Debugw("create-kv-client", log.Fields{"kvstore": rw.config.KVStoreType})
-	var err error
 	if rw.kvClient, err = newKVClient(
 		rw.config.KVStoreType,
-		rw.config.KVStoreHost+":"+strconv.Itoa(rw.config.KVStorePort),
+		rw.config.KVStoreAddress,
 		rw.config.KVStoreTimeout); err != nil {
 		logger.Fatal(err)
 	}
-	cm := conf.NewConfigManager(rw.kvClient, rw.config.KVStoreType, rw.config.KVStoreHost, rw.config.KVStorePort, rw.config.KVStoreTimeout)
+	cm := conf.NewConfigManager(rw.kvClient, rw.config.KVStoreType, rw.config.KVStoreAddress, rw.config.KVStoreTimeout)
 	go conf.StartLogLevelConfigProcessing(cm, ctx)
 
 	// Setup Kafka Client
 	if rw.kafkaClient, err = newKafkaClient("sarama",
-		rw.config.KafkaAdapterHost,
-		rw.config.KafkaAdapterPort,
+		rw.config.KafkaAdapterAddress,
 		instanceID,
 		rw.config.LiveProbeInterval/2); err != nil {
 		logger.Fatal("Unsupported-kafka-client")
@@ -266,8 +264,9 @@ func main() {
 	 * is done in the main function so just in case the main starts multiple other
 	 * objects there can be a single probe end point for the process.
 	 */
+
 	p := &probe.Probe{}
-	go p.ListenAndServe(fmt.Sprintf("%s:%d", rw.config.ProbeHost, rw.config.ProbePort))
+	go p.ListenAndServe(rw.config.ProbeAddress)
 
 	// Add the probe to the context to pass to all the services started
 	probeCtx := context.WithValue(ctx, probe.ProbeContextKey, p)
