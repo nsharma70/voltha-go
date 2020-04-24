@@ -97,10 +97,6 @@ func (rw *rwCore) start(ctx context.Context, instanceID string) {
 	logger.Info("Starting RW Core components")
 
 	var err error
-	err = kvstore.ValidateAddress(rw.config.KVStoreAddress)
-	if err != nil {
-		logger.Fatal("Invalid address")
-	}
 
 	// Setup KV Client
 	logger.Debugw("create-kv-client", log.Fields{"kvstore": rw.config.KVStoreType})
@@ -112,11 +108,6 @@ func (rw *rwCore) start(ctx context.Context, instanceID string) {
 	}
 	cm := conf.NewConfigManager(rw.kvClient, rw.config.KVStoreType, rw.config.KVStoreAddress, rw.config.KVStoreTimeout)
 	go conf.StartLogLevelConfigProcessing(cm, ctx)
-
-	err = kvstore.ValidateAddress(rw.config.KafkaAdapterAddress)
-	if err != nil {
-		logger.Fatal("Invalid address")
-	}
 
 	// Setup Kafka Client
 	if rw.kafkaClient, err = newKafkaClient("sarama",

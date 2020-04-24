@@ -57,22 +57,24 @@ const (
 	defaultProbeAddress              = ":8080"
 )
 
-type stringValue string
+type stringValue struct {
+	S *string
+}
 
-func (i *stringValue) Set(s string) error {
+func (val stringValue) Set(s string) error {
 	if err := common.ValidateAddress(s); err != nil {
 		return err
 	}
-	*i = stringValue(s)
+	*val.S = s
 
 	return nil
 }
 
-func (i *stringValue) String() string {
-	if *i == "" {
-		return defaultKafkaAdapterAddress
+func (val stringValue) String() string {
+	if val.S != nil {
+		return *val.S
 	}
-	return string(*i)
+	return ""
 }
 
 // RWCoreFlags represents the set of configurations used by the read-write core service
@@ -80,7 +82,7 @@ type RWCoreFlags struct {
 	// Command line parameters
 	RWCoreEndpoint            string
 	GrpcAddress               string
-	KafkaAdapterAddress       stringValue
+	KafkaAdapterAddress       string
 	KafkaClusterAddress       string
 	KVStoreType               string
 	KVStoreTimeout            int // in seconds
@@ -145,7 +147,6 @@ func NewRWCoreFlags() *RWCoreFlags {
 
 // ParseCommandArguments parses the arguments when running read-write core service
 func (cf *RWCoreFlags) ParseCommandArguments() {
-
 	help := fmt.Sprintf("RW core endpoint address")
 	flag.StringVar(&(cf.RWCoreEndpoint), "vcore-endpoint", defaultRWCoreEndpoint, help)
 
@@ -153,10 +154,10 @@ func (cf *RWCoreFlags) ParseCommandArguments() {
 	flag.StringVar(&(cf.GrpcAddress), "grpc_address", defaultGrpcAddress, help)
 
 	help = fmt.Sprintf("Kafka - Adapter messaging address")
-	flag.Var(&(cf.KafkaAdapterAddress), "kafka_adapter_address", help)
+	flag.Var(&stringValue{&cf.KafkaAdapterAddress}, "kafka_adapter_address", help)
 
 	help = fmt.Sprintf("Kafka - Cluster messaging address")
-	flag.StringVar(&(cf.KafkaClusterAddress), "kafka_cluster_address", defaultKafkaClusterAddress, help)
+	flag.Var(&stringValue{&cf.KafkaClusterAddress}, "kafka_cluster_address", help)
 
 	help = fmt.Sprintf("RW Core topic")
 	flag.StringVar(&(cf.CoreTopic), "rw_core_topic", defaultCoreTopic, help)
@@ -174,7 +175,7 @@ func (cf *RWCoreFlags) ParseCommandArguments() {
 	flag.IntVar(&(cf.KVStoreTimeout), "kv_store_request_timeout", defaultKVStoreTimeout, help)
 
 	help = fmt.Sprintf("KV store address")
-	flag.StringVar(&(cf.KVStoreAddress), "kv_store_address", defaultKVStoreAddress, help)
+	flag.Var(&stringValue{&cf.KVStoreAddress}, "kv_store_address", help)
 
 	help = fmt.Sprintf("The time to wait before deleting a completed transaction key")
 	flag.IntVar(&(cf.KVTxnKeyDelTime), "kv_txn_delete_time", defaultKVTxnKeyDelTime, help)
